@@ -1,0 +1,11 @@
+# Generated from proto/ by `make gen`
+/gen/
+
+# Frontend
+/web/node_modules/
+/web/dist/
+
+# Local
+.env
+*.log
+.DS_Store

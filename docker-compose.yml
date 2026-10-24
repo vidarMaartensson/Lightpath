@@ -1,0 +1,79 @@
+# The whole system on one machine: Postgres, the two gRPC services and the
+# gateway. Only the gateway is published; the rest talk on the private
+# compose network.
+#
+#   make up      # build and start
+#   make logs    # follow logs
+#   make down    # stop
+
+x-service: &service
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    <<: *service
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lightpath
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lightpath}
+      POSTGRES_DB: lightpath
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lightpath -d lightpath"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  topology:
+    <<: *service
+    build:
+      context: .
+      target: service
+      args:
+        SERVICE: topology
+    environment:
+      LISTEN_ADDR: ":9001"
+      DATABASE_URL: postgres://lightpath:${POSTGRES_PASSWORD:-lightpath}@postgres:5432/lightpath?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  impact:
+    <<: *service
+    build:
+      context: .
+      target: service
+      args:
+        SERVICE: impact
+    environment:
+      LISTEN_ADDR: ":9002"
+      TOPOLOGY_ADDR: topology:9001
+      TOPOLOGY_TTL: 30s
+    depends_on:
+      - topology
+
+  gateway:
+    <<: *service
+    build:
+      context: .
+      target: gateway
+      args:
+        SERVICE: gateway
+    environment:
+      LISTEN_ADDR: ":8080"
+      TOPOLOGY_ADDR: topology:9001
+      IMPACT_ADDR: impact:9002
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      - topology
+      - impact
+
+volumes:
+  pgdata:

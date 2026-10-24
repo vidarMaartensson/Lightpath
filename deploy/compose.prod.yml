@@ -1,0 +1,28 @@
+# Production override: Caddy in front of the gateway, with automatic HTTPS
+# from Let's Encrypt. The gateway is no longer published directly.
+#
+#   DOMAIN=lightpath.example.com POSTGRES_PASSWORD=... \
+#     docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d --build
+
+services:
+  gateway:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to the hostname pointing at this server}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+
+volumes:
+  caddy_data:
+  caddy_config:

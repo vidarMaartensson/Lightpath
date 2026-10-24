@@ -1,0 +1,81 @@
+schema {
+  query: Query
+}
+
+type Query {
+  "The network as built: sites, fibre and providers."
+  network: Network!
+  "Who loses service if these nodes go down. An empty list gives the normal state."
+  outage(failedNodeIds: [ID!]!): Outage!
+}
+
+enum NodeKind {
+  CORE
+  AGGREGATION
+  ACCESS
+  CABINET
+}
+
+enum NodeState {
+  "Normal path to the core is intact."
+  ONLINE
+  "Normal path is broken, traffic found another way."
+  REROUTED
+  "No path to any core."
+  ISOLATED
+  "The node itself is down."
+  FAILED
+}
+
+type Network {
+  nodes: [Node!]!
+  links: [Link!]!
+  isps: [Isp!]!
+}
+
+type Node {
+  id: ID!
+  name: String!
+  area: String!
+  kind: NodeKind!
+  x: Float!
+  y: Float!
+}
+
+type Link {
+  id: ID!
+  a: ID!
+  b: ID!
+}
+
+type Isp {
+  id: ID!
+  name: String!
+}
+
+type Outage {
+  failedNodeIds: [ID!]!
+  totalCustomers: Int!
+  affectedCustomers: Int!
+  reroutedCustomers: Int!
+  "True when the answer is based on the last known topology."
+  stale: Boolean!
+  "Providers to notify, most affected first."
+  isps: [IspImpact!]!
+  nodes: [NodeImpact!]!
+}
+
+type IspImpact {
+  ispId: ID!
+  customers: Int!
+  affected: Int!
+  rerouted: Int!
+}
+
+type NodeImpact {
+  nodeId: ID!
+  state: NodeState!
+  customers: Int!
+  affected: Int!
+  rerouted: Int!
+}

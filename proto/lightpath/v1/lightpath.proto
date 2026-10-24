@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package lightpath.v1;
+
+option go_package = "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1;lightpathv1";
+
+// ---------------------------------------------------------------------------
+// Topology: the network as it is built.
+// ---------------------------------------------------------------------------
+
+service TopologyService {
+  // GetNetwork returns the full current topology snapshot.
+  rpc GetNetwork(GetNetworkRequest) returns (GetNetworkResponse);
+}
+
+enum NodeKind {
+  NODE_KIND_UNSPECIFIED = 0;
+  NODE_KIND_CORE = 1;
+  NODE_KIND_AGGREGATION = 2;
+  NODE_KIND_ACCESS = 3;
+  NODE_KIND_CABINET = 4;
+}
+
+message Node {
+  string id = 1;
+  string name = 2;
+  string area = 3;
+  NodeKind kind = 4;
+  // Position on a schematic map, 0..1000 by 0..620.
+  double x = 5;
+  double y = 6;
+}
+
+// An undirected fibre link. Link order is significant: a node's first
+// listed uplink is its primary path.
+message Link {
+  string id = 1;
+  string node_a_id = 2;
+  string node_b_id = 3;
+}
+
+message Isp {
+  string id = 1;
+  string name = 2;
+}
+
+message Customer {
+  string id = 1;
+  string isp_id = 2;
+  // Cabinets the customer is attached to, primary first.
+  repeated string node_ids = 3;
+  bool business = 4;
+}
+
+message Network {
+  repeated Node nodes = 1;
+  repeated Link links = 2;
+  repeated Isp isps = 3;
+  repeated Customer customers = 4;
+}
+
+message GetNetworkRequest {}
+
+message GetNetworkResponse {
+  Network network = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Impact: who loses service when sites fail.
+// ---------------------------------------------------------------------------
+
+service ImpactService {
+  // AnalyzeOutage applies the failed nodes to the current topology.
+  // Unknown node ids return INVALID_ARGUMENT. If topology is unavailable
+  // and nothing is cached, UNAVAILABLE.
+  rpc AnalyzeOutage(AnalyzeOutageRequest) returns (AnalyzeOutageResponse);
+}
+
+enum NodeState {
+  NODE_STATE_UNSPECIFIED = 0;
+  // Normal path to the core is intact.
+  NODE_STATE_ONLINE = 1;
+  // Normal path is broken, traffic found another way.
+  NODE_STATE_REROUTED = 2;
+  // No path to any core.
+  NODE_STATE_ISOLATED = 3;
+  // The node itself is down.
+  NODE_STATE_FAILED = 4;
+}
+
+message NodeImpact {
+  string node_id = 1;
+  NodeState state = 2;
+  // Counted at the customer's primary cabinet only.
+  int32 customers = 3;
+  int32 affected = 4;
+  int32 rerouted = 5;
+}
+
+message IspImpact {
+  string isp_id = 1;
+  int32 customers = 2;
+  int32 affected = 3;
+  int32 rerouted = 4;
+}
+
+message AnalyzeOutageRequest {
+  repeated string failed_node_ids = 1;
+}
+
+message AnalyzeOutageResponse {
+  repeated string failed_node_ids = 1;
+  int32 total_customers = 2;
+  int32 affected_customers = 3;
+  int32 rerouted_customers = 4;
+  // Most affected first.
+  repeated IspImpact isps = 5;
+  repeated NodeImpact nodes = 6;
+  // True when the topology service was unreachable and the last known
+  // snapshot was used.
+  bool stale = 7;
+}

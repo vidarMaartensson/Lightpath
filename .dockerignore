@@ -1,0 +1,7 @@
+.git
+.github
+gen
+web/node_modules
+web/dist
+*.log
+.env
