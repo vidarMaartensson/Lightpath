@@ -20,6 +20,9 @@ test: ## All tests: Go (with race detector) and frontend
 	go test -race ./...
 	cd web && npm test
 
+e2e: ## Browser tests: starts its own services, needs Go and Playwright's Chromium
+	cd web && npm run e2e
+
 dev: ## Run all services locally without Docker (in-memory topology) + Vite
 	@trap 'kill 0' EXIT; \
 	LISTEN_ADDR=:9001 go run ./cmd/topology & \
@@ -39,4 +42,4 @@ logs: ## Follow logs from all services
 deploy: ## Production: compose + Caddy with HTTPS (needs DOMAIN, POSTGRES_PASSWORD)
 	docker compose -f docker-compose.yml -f deploy/compose.prod.yml up -d --build
 
-.PHONY: help setup gen lint test dev up down logs deploy
+.PHONY: help setup gen lint test e2e dev up down logs deploy
