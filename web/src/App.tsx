@@ -5,6 +5,7 @@ import { NetworkMap } from "./components/NetworkMap";
 import { NodeDetail } from "./components/NodeDetail";
 import { ProviderList } from "./components/ProviderList";
 import { Scenarios } from "./components/Scenarios";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { readDownFromUrl, writeDownToUrl } from "./lib/url";
 import type { Network, NodeImpact, NodeState, Outage } from "./types";
 
@@ -93,6 +94,7 @@ export function App() {
           Lightpath
         </div>
         <p className="brand-tag">Outage impact on an open access fibre network</p>
+        <ThemeToggle />
       </header>
 
       <section className="lede" aria-live="polite">
