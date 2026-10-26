@@ -21,22 +21,22 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0c1a22;
-    --ink: #e4edf0;
-    --ink-2: #9db0ba;
-    --ink-3: #6c818d;
-    --rule: #1f3340;
-    --track: #2b4250;
+/* index.html sets data-theme before first paint, from the user's choice or
+   the system setting (see src/lib/theme.ts). */
+:root[data-theme="dark"] {
+  --paper: #0c1a22;
+  --ink: #e4edf0;
+  --ink-2: #9db0ba;
+  --ink-3: #6c818d;
+  --rule: #1f3340;
+  --track: #2b4250;
 
-    --light: #38c6de;
-    --reroute: #a28cff;
-    --reroute-wash: #261f45;
-    --down: #ff6b5b;
-    --down-wash: #3a1d1c;
-    color-scheme: dark;
-  }
+  --light: #38c6de;
+  --reroute: #a28cff;
+  --reroute-wash: #261f45;
+  --down: #ff6b5b;
+  --down-wash: #3a1d1c;
+  color-scheme: dark;
 }
 
 *,
@@ -116,6 +116,44 @@ code {
 .brand-tag {
   margin: 0;
   color: var(--ink-2);
+}
+
+.theme-toggle {
+  margin-left: auto;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: var(--ink);
+  border-color: var(--track);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 760px) {
+  /* When the tagline wraps, keep the toggle top right instead of letting it
+     fall onto a line of its own. */
+  .masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .theme-toggle {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
 }
 
 .lede {

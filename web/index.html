@@ -14,6 +14,24 @@
       rel="stylesheet"
     />
     <title>Lightpath</title>
+    <script>
+      // Set the theme before first paint so the page never flashes the wrong one.
+      // Same lookup as src/lib/theme.ts: the user's choice, else the system.
+      (function () {
+        var choice = null;
+        try {
+          choice = localStorage.getItem("lightpath-theme");
+        } catch (e) {}
+        var dark = choice === "dark" || (choice !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        if (choice === "light" || choice === "dark") {
+          var paper = dark ? "#0c1a22" : "#f2f5f6";
+          document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) {
+            m.setAttribute("content", paper);
+          });
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
