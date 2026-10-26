@@ -19,6 +19,9 @@ jobs:
           breaking: ${{ github.event_name == 'pull_request' }}
           breaking_against: ${{ github.event.repository.clone_url }}#branch=main
           push: false
+          # Results show as the check status; posting a PR comment would need
+          # pull-requests: write, which the default token does not have.
+          pr_comment: false
 
   go:
     runs-on: ubuntu-latest
