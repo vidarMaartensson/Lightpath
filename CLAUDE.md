@@ -43,6 +43,7 @@ See `README.md` for the architecture and the reasoning behind it.
 ```bash
 make setup   # first time: buf generate, go mod tidy, npm install
 make test    # all tests; must pass before you say you are done
+make e2e     # browser tests (Playwright); run when you change the UI
 make lint    # buf lint, go vet, tsc
 make dev     # run locally without Docker
 make up      # run in Docker

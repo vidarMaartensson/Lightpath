@@ -63,6 +63,10 @@ make test    # Go tests with the race detector, frontend tests
 make up      # whole stack in Docker on http://localhost:8080
 ```
 
+`make e2e` runs the browser tests in `web/e2e` with Playwright. It starts its own copy of the
+services on unusual ports, so it does not need Docker and does not clash with `make dev` or
+`make up`. The first time, install the browser with `cd web && npx playwright install chromium`.
+
 Without Docker, `make dev` runs the three Go services with an in-memory topology and the Vite
 dev server on http://localhost:5173.
 
