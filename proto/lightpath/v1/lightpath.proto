@@ -4,6 +4,8 @@ package lightpath.v1;
 
 option go_package = "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1;lightpathv1";
 
+import "google/protobuf/timestamp.proto";
+
 // ---------------------------------------------------------------------------
 // Topology: the network as it is built.
 // ---------------------------------------------------------------------------
@@ -119,4 +121,57 @@ message AnalyzeOutageResponse {
   // True when the topology service was unreachable and the last known
   // snapshot was used.
   bool stale = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Events: which sites are down right now, as reported by event sources.
+// ---------------------------------------------------------------------------
+
+service EventService {
+  // GetState returns which sites are down right now.
+  rpc GetState(GetStateRequest) returns (GetStateResponse);
+  // WatchState sends the current state first, then one message per change.
+  // Every message carries the full state, so a client that reconnects is
+  // up to date after its first message.
+  rpc WatchState(WatchStateRequest) returns (stream WatchStateResponse);
+}
+
+enum EventKind {
+  EVENT_KIND_UNSPECIFIED = 0;
+  EVENT_KIND_SITE_DOWN = 1;
+  EVENT_KIND_SITE_RESTORED = 2;
+}
+
+message Event {
+  // Orders the changes to the state. Restarts from zero when the events
+  // service restarts, so clients must not compare it across connections.
+  uint64 seq = 1;
+  // Unique per source event; repeated ids are ignored.
+  string id = 2;
+  EventKind kind = 3;
+  string node_id = 4;
+  google.protobuf.Timestamp at = 5;
+  // Where the event came from, such as "simulator".
+  string source = 6;
+}
+
+message LiveState {
+  uint64 seq = 1;
+  // Sorted.
+  repeated string down_node_ids = 2;
+}
+
+message GetStateRequest {}
+
+message GetStateResponse {
+  LiveState state = 1;
+}
+
+message WatchStateRequest {}
+
+message WatchStateResponse {
+  LiveState state = 1;
+  // The event that caused this change. Unset on the first message, which
+  // is the state at the time the client connected.
+  Event cause = 2;
 }
