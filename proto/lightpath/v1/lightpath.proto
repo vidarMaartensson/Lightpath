@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package lightpath.v1;
 
-option go_package = "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1;lightpathv1";
-
 import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1;lightpathv1";
 
 // ---------------------------------------------------------------------------
 // Topology: the network as it is built.
