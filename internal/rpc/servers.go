@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1"
+	"github.com/vidarMaartensson/Lightpath/internal/eventsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/impactsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/topology"
 )
@@ -38,7 +39,13 @@ type ImpactServer struct {
 
 // AnalyzeOutage implements pb.ImpactServiceServer.
 func (s *ImpactServer) AnalyzeOutage(ctx context.Context, req *pb.AnalyzeOutageRequest) (*pb.AnalyzeOutageResponse, error) {
-	a, err := s.Service.Analyze(ctx, req.GetFailedNodeIds())
+	var a impactsvc.Analysis
+	var err error
+	if b := req.GetBaseline(); b != nil {
+		a, err = s.Service.AnalyzeChange(ctx, b.GetFailedNodeIds(), req.GetFailedNodeIds())
+	} else {
+		a, err = s.Service.Analyze(ctx, req.GetFailedNodeIds())
+	}
 	switch {
 	case errors.Is(err, impactsvc.ErrInvalidInput):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -78,5 +85,60 @@ func LoggingInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 			slog.Duration("duration", time.Since(start)),
 		)
 		return resp, err
+	}
+}
+
+// EventServer serves the live state of which sites are down.
+type EventServer struct {
+	pb.UnimplementedEventServiceServer
+	Service *eventsvc.Service
+	// Live is reported by GetState: whether a source feeds the state.
+	Live bool
+}
+
+// GetState implements pb.EventServiceServer.
+func (s *EventServer) GetState(context.Context, *pb.GetStateRequest) (*pb.GetStateResponse, error) {
+	return &pb.GetStateResponse{State: LiveStateToProto(s.Service.State()), Live: s.Live}, nil
+}
+
+// WatchState implements pb.EventServiceServer. It ends with UNAVAILABLE
+// when the client fell too far behind: reconnecting is the fix, and the
+// new stream starts with the full state.
+func (s *EventServer) WatchState(_ *pb.WatchStateRequest, stream pb.EventService_WatchStateServer) error {
+	sub := s.Service.Subscribe()
+	defer sub.Close()
+	ctx := stream.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return status.FromContextError(ctx.Err()).Err()
+		case u, ok := <-sub.C:
+			if !ok {
+				return status.Error(codes.Unavailable, "client fell behind the live state, reconnect to get it again")
+			}
+			if err := stream.Send(UpdateToProto(u)); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// LoggingStreamInterceptor logs every stream when it ends, with how long
+// it was open and its code. A client hanging up is a normal end.
+func LoggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		start := time.Now()
+		err := handler(srv, ss)
+		code := status.Code(err)
+		level := slog.LevelInfo
+		if code != codes.OK && code != codes.Canceled {
+			level = slog.LevelWarn
+		}
+		log.LogAttrs(ss.Context(), level, "stream",
+			slog.String("method", info.FullMethod),
+			slog.String("code", code.String()),
+			slog.Duration("duration", time.Since(start)),
+		)
+		return err
 	}
 }

@@ -53,3 +53,12 @@ export interface Outage {
   isps: IspImpact[];
   nodes: NodeImpact[];
 }
+
+export type LiveStatus = "ON" | "OFF" | "UNAVAILABLE";
+
+/** What one step between two outages did to customers. */
+export interface CustomerChange {
+  lost: number;
+  regained: number;
+  rerouted: number;
+}

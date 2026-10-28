@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 const headline = (page: import("@playwright/test").Page) => page.getByRole("heading", { level: 1 });
 
 test("shows the whole network with service when nothing is down", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?mode=sandbox");
 
   await expect(headline(page)).toHaveText("All 1,526 customers have service.");
   await expect(page.getByRole("heading", { name: "Providers on the network" })).toBeVisible();
@@ -14,7 +14,7 @@ test("shows the whole network with service when nothing is down", async ({ page 
 });
 
 test("taking a site down on the map shows who lost service", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?mode=sandbox");
   await expect(headline(page)).toHaveText("All 1,526 customers have service.");
 
   await page.getByRole("button", { name: /^Centrum aggregation,/ }).click();
@@ -25,11 +25,11 @@ test("taking a site down on the map shows who lost service", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Providers to notify" })).toBeVisible();
   await expect(page.locator(".provider").filter({ hasText: "Älvnät" })).toContainText("64 of 651 down");
   await expect(page.locator(".down-list")).toContainText("Centrum aggregation");
-  await expect(page).toHaveURL(/\?down=agg-cen$/);
+  await expect(page).toHaveURL(/\?down=agg-cen&mode=sandbox$/);
 });
 
 test("a prepared scenario where backup paths absorb the failure", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?mode=sandbox");
 
   const scenario = page.getByRole("button", { name: "Core A fails" });
   await scenario.click();

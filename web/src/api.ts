@@ -1,4 +1,4 @@
-import type { Network, Outage } from "./types";
+import type { CustomerChange, LiveStatus, Network, Outage } from "./types";
 
 const NETWORK_QUERY = /* GraphQL */ `
   query Network {
@@ -49,6 +49,26 @@ const OUTAGE_QUERY = /* GraphQL */ `
   }
 `;
 
+const LIVE_STATUS_QUERY = /* GraphQL */ `
+  query LiveStatus {
+    liveStatus
+  }
+`;
+
+// The effect of one live event: the outage after it, compared with the
+// sites that were down just before. The impact service does the counting.
+const CHANGE_QUERY = /* GraphQL */ `
+  query Change($failed: [ID!]!, $baseline: [ID!]!) {
+    outage(failedNodeIds: $failed, baselineNodeIds: $baseline) {
+      change {
+        lost
+        regained
+        rerouted
+      }
+    }
+  }
+`;
+
 export class ApiError extends Error {}
 
 async function request<T>(query: string, variables: object, signal?: AbortSignal): Promise<T> {
@@ -85,4 +105,25 @@ export async function fetchNetwork(signal?: AbortSignal): Promise<Network> {
 export async function fetchOutage(failed: string[], signal?: AbortSignal): Promise<Outage> {
   const data = await request<{ outage: Outage }>(OUTAGE_QUERY, { failed }, signal);
   return data.outage;
+}
+
+export async function fetchLiveStatus(signal?: AbortSignal): Promise<LiveStatus> {
+  const data = await request<{ liveStatus: LiveStatus }>(LIVE_STATUS_QUERY, {}, signal);
+  return data.liveStatus;
+}
+
+export async function fetchChange(
+  failed: string[],
+  baseline: string[],
+  signal?: AbortSignal,
+): Promise<CustomerChange> {
+  const data = await request<{ outage: { change: CustomerChange | null } }>(
+    CHANGE_QUERY,
+    { failed, baseline },
+    signal,
+  );
+  if (!data.outage.change) {
+    throw new ApiError("The gateway returned no change.");
+  }
+  return data.outage.change;
 }

@@ -5,7 +5,11 @@ package rpc
 import (
 	"fmt"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	pb "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1"
+	"github.com/vidarMaartensson/Lightpath/internal/events"
+	"github.com/vidarMaartensson/Lightpath/internal/eventsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/impact"
 	"github.com/vidarMaartensson/Lightpath/internal/impactsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/network"
@@ -109,6 +113,11 @@ func AnalysisToProto(a impactsvc.Analysis) *pb.AnalyzeOutageResponse {
 		Nodes:             make([]*pb.NodeImpact, 0, len(a.Nodes)),
 		Stale:             a.Stale,
 	}
+	if c := a.Change; c != nil {
+		out.Change = &pb.CustomerChange{
+			Lost: int32(c.Lost), Regained: int32(c.Regained), Rerouted: int32(c.Rerouted),
+		}
+	}
 	for _, i := range a.ISPs {
 		out.Isps = append(out.Isps, &pb.IspImpact{
 			IspId: i.ISPID, Customers: int32(i.Customers), Affected: int32(i.Affected), Rerouted: int32(i.Rerouted),
@@ -119,6 +128,74 @@ func AnalysisToProto(a impactsvc.Analysis) *pb.AnalyzeOutageResponse {
 			NodeId: n.NodeID, State: stateToProto[n.State],
 			Customers: int32(n.Customers), Affected: int32(n.Affected), Rerouted: int32(n.Rerouted),
 		})
+	}
+	return out
+}
+
+var eventKindToProto = map[events.Kind]pb.EventKind{
+	events.SiteDown:     pb.EventKind_EVENT_KIND_SITE_DOWN,
+	events.SiteRestored: pb.EventKind_EVENT_KIND_SITE_RESTORED,
+}
+
+var eventKindFromProto = func() map[pb.EventKind]events.Kind {
+	m := make(map[pb.EventKind]events.Kind, len(eventKindToProto))
+	for k, v := range eventKindToProto {
+		m[v] = k
+	}
+	return m
+}()
+
+// EventToProto converts a domain event to its wire form.
+func EventToProto(e events.Event) *pb.Event {
+	return &pb.Event{
+		Seq:    e.Seq,
+		Id:     e.ID,
+		Kind:   eventKindToProto[e.Kind],
+		NodeId: e.NodeID,
+		At:     timestamppb.New(e.At),
+		Source: e.Source,
+	}
+}
+
+// EventFromProto converts a wire event. Whether the node exists is left to
+// the caller, which has the topology.
+func EventFromProto(p *pb.Event) (events.Event, error) {
+	if p == nil {
+		return events.Event{}, fmt.Errorf("%w: empty event", events.ErrInvalidEvent)
+	}
+	kind, ok := eventKindFromProto[p.GetKind()]
+	if !ok {
+		return events.Event{}, fmt.Errorf("%w: event %q has kind %s", events.ErrInvalidEvent, p.GetId(), p.GetKind())
+	}
+	// A missing time would become 1970 and put the event first in every
+	// feed, so it is rejected rather than defaulted.
+	if p.GetAt() == nil {
+		return events.Event{}, fmt.Errorf("%w: event %q has no time", events.ErrInvalidEvent, p.GetId())
+	}
+	if err := p.GetAt().CheckValid(); err != nil {
+		return events.Event{}, fmt.Errorf("%w: event %q: %w", events.ErrInvalidEvent, p.GetId(), err)
+	}
+	return events.Event{
+		Seq:    p.GetSeq(),
+		ID:     p.GetId(),
+		Kind:   kind,
+		NodeID: p.GetNodeId(),
+		At:     p.GetAt().AsTime(),
+		Source: p.GetSource(),
+	}, nil
+}
+
+// LiveStateToProto converts the state part of an update.
+func LiveStateToProto(u eventsvc.Update) *pb.LiveState {
+	return &pb.LiveState{Seq: u.Seq, DownNodeIds: u.Down}
+}
+
+// UpdateToProto converts an update for the WatchState stream. The cause is
+// left unset for the snapshot a stream starts with.
+func UpdateToProto(u eventsvc.Update) *pb.WatchStateResponse {
+	out := &pb.WatchStateResponse{State: LiveStateToProto(u)}
+	if u.Cause != nil {
+		out.Cause = EventToProto(*u.Cause)
 	}
 	return out
 }

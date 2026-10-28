@@ -5,8 +5,23 @@ schema {
 type Query {
   "The network as built: sites, fibre and providers."
   network: Network!
-  "Who loses service if these nodes go down. An empty list gives the normal state."
-  outage(failedNodeIds: [ID!]!): Outage!
+  """
+  Who loses service if these nodes go down. An empty list gives the normal state.
+  With baselineNodeIds, change also says what moving from those failures to
+  these did to customers; an empty baseline means nothing was down before.
+  """
+  outage(failedNodeIds: [ID!]!, baselineNodeIds: [ID!]): Outage!
+  "Whether the live view can be shown. The sandbox works either way."
+  liveStatus: LiveStatus!
+}
+
+enum LiveStatus {
+  "Sites fail and recover by themselves; /live streams the state."
+  ON
+  "No live source runs. The app is a sandbox only."
+  OFF
+  "Live is configured but the events service did not answer."
+  UNAVAILABLE
 }
 
 enum NodeKind {
@@ -63,6 +78,18 @@ type Outage {
   "Providers to notify, most affected first."
   isps: [IspImpact!]!
   nodes: [NodeImpact!]!
+  "Set only when the query had a baseline."
+  change: CustomerChange
+}
+
+"What changed for customers since the baseline, counted customer by customer."
+type CustomerChange {
+  "Had service before, has none now."
+  lost: Int!
+  "Had no service before, has it now."
+  regained: Int!
+  "Has service in both, but now only over another path."
+  rerouted: Int!
 }
 
 type IspImpact {

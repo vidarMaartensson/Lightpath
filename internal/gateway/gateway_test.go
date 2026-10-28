@@ -43,12 +43,12 @@ func (memSource) Network(context.Context) (*network.Network, error) { return net
 
 func newServer(t *testing.T, topo TopologyClient) *httptest.Server {
 	t.Helper()
-	schema, err := NewSchema(topo, fakeImpact{svc: impactsvc.New(memSource{}, 0)})
+	schema, err := NewSchema(topo, fakeImpact{svc: impactsvc.New(memSource{}, 0)}, nil)
 	if err != nil {
 		t.Fatalf("schema: %v", err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := httptest.NewServer(Handler(schema, "", log))
+	srv := httptest.NewServer(Handler(schema, nil, "", log))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -141,5 +141,47 @@ func TestTopologyDownIsReportedPlainly(t *testing.T) {
 	msg := res.Errors[0].Message
 	if !strings.Contains(msg, "not responding") || strings.Contains(msg, "dial tcp") {
 		t.Fatalf("error should be plain and not leak internals: %q", msg)
+	}
+}
+
+func TestOutageChange(t *testing.T) {
+	srv := newServer(t, fakeTopology{})
+	q := `query($ids: [ID!]!, $base: [ID!]) { outage(failedNodeIds: $ids, baselineNodeIds: $base) {
+		change { lost regained rerouted }
+	} }`
+	type change struct{ Lost, Regained, Rerouted int }
+	tests := []struct {
+		name string
+		vars map[string]any
+		want *change
+	}{
+		{"no baseline gives no change", map[string]any{"ids": []string{"acc-ali"}}, nil},
+		{"empty baseline means nothing was down", map[string]any{"ids": []string{"acc-ali"}, "base": []string{}},
+			&change{Lost: 76, Rerouted: 104}},
+		{"restore", map[string]any{"ids": []string{}, "base": []string{"acc-ali"}}, &change{Regained: 76}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := post(t, srv.URL, q, tt.vars)
+			if len(res.Errors) > 0 {
+				t.Fatalf("errors: %+v", res.Errors)
+			}
+			var data struct{ Outage struct{ Change *change } }
+			if err := json.Unmarshal(res.Data, &data); err != nil {
+				t.Fatal(err)
+			}
+			got := data.Outage.Change
+			if (got == nil) != (tt.want == nil) || (got != nil && *got != *tt.want) {
+				t.Fatalf("change = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOutageUnknownBaselineNodeIsAUserError(t *testing.T) {
+	srv := newServer(t, fakeTopology{})
+	res := post(t, srv.URL, `{ outage(failedNodeIds: [], baselineNodeIds: ["acc-nowhere"]) { affectedCustomers } }`, nil)
+	if len(res.Errors) == 0 || !strings.Contains(res.Errors[0].Message, "baseline") {
+		t.Fatalf("want an error naming the baseline, got %+v", res.Errors)
 	}
 }

@@ -15,13 +15,17 @@ import (
 	"github.com/vidarMaartensson/Lightpath/internal/network"
 )
 
-// serviceConfig gives every call a deadline and retries UNAVAILABLE with
-// backoff. Both RPCs are reads, so retrying them is safe.
+// serviceConfig gives every unary call a deadline and retries UNAVAILABLE
+// with backoff. They are all reads, so retrying them is safe.
+//
+// EventService/WatchState is left out on purpose: it is a stream that stays
+// open for as long as someone watches, and a 3s deadline would cut it off.
 const serviceConfig = `{
   "methodConfig": [{
     "name": [
       {"service": "lightpath.v1.TopologyService"},
-      {"service": "lightpath.v1.ImpactService"}
+      {"service": "lightpath.v1.ImpactService"},
+      {"service": "lightpath.v1.EventService", "method": "GetState"}
     ],
     "timeout": "3s",
     "retryPolicy": {
@@ -51,7 +55,10 @@ func Dial(addr string) (*grpc.ClientConn, error) {
 // NewServer returns a gRPC server with logging, the standard health
 // service and reflection (so grpcurl works against it).
 func NewServer(log *slog.Logger) (*grpc.Server, *health.Server) {
-	srv := grpc.NewServer(grpc.UnaryInterceptor(LoggingInterceptor(log)))
+	srv := grpc.NewServer(
+		grpc.UnaryInterceptor(LoggingInterceptor(log)),
+		grpc.StreamInterceptor(LoggingStreamInterceptor(log)),
+	)
 	hs := health.NewServer()
 	healthpb.RegisterHealthServer(srv, hs)
 	reflection.Register(srv)

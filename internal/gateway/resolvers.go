@@ -32,9 +32,10 @@ type ImpactClient interface {
 
 // NewSchema parses the schema and binds it to the resolvers. The schema
 // documents itself with quoted descriptions, which graphql-go only accepts
-// with UseStringDescriptions.
-func NewSchema(topology TopologyClient, impact ImpactClient) (*graphql.Schema, error) {
-	return graphql.ParseSchema(schemaSDL, &Resolver{topology: topology, impact: impact},
+// with UseStringDescriptions. events may be nil when no events service is
+// configured; liveStatus is then OFF.
+func NewSchema(topology TopologyClient, impact ImpactClient, events EventsClient) (*graphql.Schema, error) {
+	return graphql.ParseSchema(schemaSDL, &Resolver{topology: topology, impact: impact, events: events},
 		graphql.UseStringDescriptions())
 }
 
@@ -42,6 +43,24 @@ func NewSchema(topology TopologyClient, impact ImpactClient) (*graphql.Schema, e
 type Resolver struct {
 	topology TopologyClient
 	impact   ImpactClient
+	events   EventsClient
+}
+
+// LiveStatus resolves Query.liveStatus. An unreachable events service is
+// an answer here, not an error: the page still loads and says so.
+func (r *Resolver) LiveStatus(ctx context.Context) string {
+	if r.events == nil {
+		return "OFF"
+	}
+	resp, err := r.events.GetState(ctx, &pb.GetStateRequest{})
+	switch {
+	case err != nil:
+		return "UNAVAILABLE"
+	case resp.GetLive():
+		return "ON"
+	default:
+		return "OFF"
+	}
 }
 
 // Network resolves Query.network.
@@ -54,16 +73,27 @@ func (r *Resolver) Network(ctx context.Context) (*networkResolver, error) {
 }
 
 // Outage resolves Query.outage.
-func (r *Resolver) Outage(ctx context.Context, args struct{ FailedNodeIds []graphql.ID }) (*outageResolver, error) {
-	ids := make([]string, len(args.FailedNodeIds))
-	for i, id := range args.FailedNodeIds {
-		ids[i] = string(id)
+func (r *Resolver) Outage(ctx context.Context, args struct {
+	FailedNodeIds   []graphql.ID
+	BaselineNodeIds *[]graphql.ID
+}) (*outageResolver, error) {
+	req := &pb.AnalyzeOutageRequest{FailedNodeIds: idStrings(args.FailedNodeIds)}
+	if args.BaselineNodeIds != nil {
+		req.Baseline = &pb.Baseline{FailedNodeIds: idStrings(*args.BaselineNodeIds)}
 	}
-	resp, err := r.impact.AnalyzeOutage(ctx, &pb.AnalyzeOutageRequest{FailedNodeIds: ids})
+	resp, err := r.impact.AnalyzeOutage(ctx, req)
 	if err != nil {
 		return nil, userError("impact", err)
 	}
 	return &outageResolver{o: resp}, nil
+}
+
+func idStrings(ids []graphql.ID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = string(id)
+	}
+	return out
 }
 
 // userError turns a gRPC error into a message for the UI. Internal details
@@ -144,6 +174,13 @@ func (r *outageResolver) AffectedCustomers() int32 { return r.o.GetAffectedCusto
 func (r *outageResolver) ReroutedCustomers() int32 { return r.o.GetReroutedCustomers() }
 func (r *outageResolver) Stale() bool              { return r.o.GetStale() }
 
+func (r *outageResolver) Change() *changeResolver {
+	if r.o.GetChange() == nil {
+		return nil
+	}
+	return &changeResolver{r.o.GetChange()}
+}
+
 func (r *outageResolver) Isps() []*ispImpactResolver {
 	out := make([]*ispImpactResolver, len(r.o.GetIsps()))
 	for i, x := range r.o.GetIsps() {
@@ -176,3 +213,9 @@ func (r *nodeImpactResolver) State() string {
 func (r *nodeImpactResolver) Customers() int32 { return r.n.GetCustomers() }
 func (r *nodeImpactResolver) Affected() int32  { return r.n.GetAffected() }
 func (r *nodeImpactResolver) Rerouted() int32  { return r.n.GetRerouted() }
+
+type changeResolver struct{ c *pb.CustomerChange }
+
+func (r *changeResolver) Lost() int32     { return r.c.GetLost() }
+func (r *changeResolver) Regained() int32 { return r.c.GetRegained() }
+func (r *changeResolver) Rerouted() int32 { return r.c.GetRerouted() }

@@ -41,9 +41,25 @@ func run(log *slog.Logger) error {
 	}
 	defer impactConn.Close()
 
+	// The live view is optional: without EVENTS_ADDR there is no /live and
+	// liveStatus is OFF, and the app is the sandbox it always was.
+	var events gateway.EventsClient
+	var live http.Handler
+	stopLive := make(chan struct{})
+	if eventsAddr := os.Getenv("EVENTS_ADDR"); eventsAddr != "" {
+		eventsConn, err := rpc.Dial(eventsAddr)
+		if err != nil {
+			return err
+		}
+		defer eventsConn.Close()
+		events = pb.NewEventServiceClient(eventsConn)
+		live = &gateway.Live{Events: events, Log: log, Stop: stopLive}
+	}
+
 	schema, err := gateway.NewSchema(
 		pb.NewTopologyServiceClient(topoConn),
 		pb.NewImpactServiceClient(impactConn),
+		events,
 	)
 	if err != nil {
 		return err
@@ -51,11 +67,14 @@ func run(log *slog.Logger) error {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           gateway.Handler(schema, os.Getenv("STATIC_DIR"), log),
+		Handler:           gateway.Handler(schema, live, os.Getenv("STATIC_DIR"), log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
 	}
+	// Shutdown waits for connections to go idle, which a live stream never
+	// does; closing stopLive ends them so shutdown is not held up.
+	srv.RegisterOnShutdown(func() { close(stopLive) })
 
 	go func() {
 		<-ctx.Done()

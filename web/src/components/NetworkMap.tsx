@@ -9,6 +9,8 @@ interface Props {
   impacts: ReadonlyMap<string, NodeImpact>;
   down: string[];
   updating: boolean;
+  /** The map follows the live network, so selecting a site changes nothing. */
+  live: boolean;
   onToggle: (id: string) => void;
   onInspect: (id: string | null) => void;
 }
@@ -20,7 +22,7 @@ const TIERS = [
   { y: 520, label: "Street cabinets" },
 ];
 
-export function NetworkMap({ network, states, impacts, down, updating, onToggle, onInspect }: Props) {
+export function NetworkMap({ network, states, impacts, down, updating, live, onToggle, onInspect }: Props) {
   const links = useMemo(() => drawLinks(network, states), [network, states]);
 
   return (
@@ -29,7 +31,11 @@ export function NetworkMap({ network, states, impacts, down, updating, onToggle,
         <svg
           viewBox="-100 0 1100 620"
           role="group"
-          aria-label="Network map. Select a site to take it down or restore it."
+          aria-label={
+            live
+              ? "Network map. It follows the live network."
+              : "Network map. Select a site to take it down or restore it."
+          }
         >
           <g className="tiers" aria-hidden="true">
             {TIERS.map((t) => (
@@ -56,6 +62,7 @@ export function NetworkMap({ network, states, impacts, down, updating, onToggle,
                 state={states.get(n.id) ?? "ONLINE"}
                 impact={impacts.get(n.id)}
                 isDown={down.includes(n.id)}
+                live={live}
                 onToggle={onToggle}
                 onInspect={onInspect}
               />
@@ -105,6 +112,7 @@ interface SiteProps {
   state: NodeState;
   impact: NodeImpact | undefined;
   isDown: boolean;
+  live: boolean;
   onToggle: (id: string) => void;
   onInspect: (id: string | null) => void;
 }
@@ -123,7 +131,7 @@ function radius(node: NetNode, customers: number) {
   }
 }
 
-const Site = memo(function Site({ node, state, impact, isDown, onToggle, onInspect }: SiteProps) {
+const Site = memo(function Site({ node, state, impact, isDown, live, onToggle, onInspect }: SiteProps) {
   const customers = impact?.customers ?? 0;
   const r = radius(node, customers);
   const { x, y } = node;
@@ -146,7 +154,7 @@ const Site = memo(function Site({ node, state, impact, isDown, onToggle, onInspe
       role="button"
       tabIndex={0}
       aria-pressed={isDown}
-      aria-label={`${label}. ${isDown ? "Press to restore." : "Press to take down."}`}
+      aria-label={`${label}.${live ? "" : isDown ? " Press to restore." : " Press to take down."}`}
       onClick={() => onToggle(node.id)}
       onKeyDown={onKey}
       onMouseEnter={() => onInspect(node.id)}

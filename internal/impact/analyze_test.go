@@ -223,4 +223,29 @@ func TestSeedScenarios(t *testing.T) {
 			t.Errorf("cab-vsl-2 = %s, want REROUTED", s["cab-vsl-2"])
 		}
 	})
+
+	// The live feed describes each event by its Diff. These are the lines
+	// it shows for the demo network.
+	diffs := []struct {
+		name          string
+		before, after []string
+		want          Change
+	}{
+		{"live: Ålidhem goes down", nil, []string{"acc-ali"}, Change{Lost: 76, Rerouted: 104}},
+		{"live: Ålidhem restored", []string{"acc-ali"}, nil, Change{Regained: 76}},
+		{"live: cabinet under Ålidhem adds nothing", []string{"acc-ali"}, []string{"acc-ali", "cab-ali-1"}, Change{}},
+		{"live: Centrum aggregation goes down", nil, []string{"agg-cen"}, Change{Lost: 140, Rerouted: 274}},
+		{"live: core failure loses no one", nil, []string{"core-a"}, Change{Rerouted: 1526}},
+	}
+	for _, tt := range diffs {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Diff(n, tt.before, tt.after)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+		})
+	}
 }
