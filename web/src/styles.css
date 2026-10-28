@@ -19,6 +19,14 @@
   --light-wash: #e2f2f5;
 
   --font: "Familjen Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* One motion language: things arrive fast and settle. Light goes out
+     quickly, like a fibre breaking, and comes back more slowly. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-fast: 140ms;
+  --dur: 200ms;
+  --dur-slow: 400ms;
+  --rise: 4px;
   color-scheme: light;
 }
 
@@ -129,6 +137,10 @@ code {
 }
 
 .theme-toggle {
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
   display: grid;
   place-items: center;
   width: 36px;
@@ -169,6 +181,7 @@ code {
 }
 
 .headline {
+  animation: rise-in var(--dur) var(--ease-out);
   margin: 0;
   max-width: 30ch;
   font-size: clamp(1.75rem, 1.05rem + 2.3vw, 2.9rem);
@@ -209,8 +222,8 @@ code {
   text-decoration-thickness: 1px;
   text-underline-offset: 5px;
   transition:
-    color 120ms,
-    text-decoration-color 120ms;
+    color var(--dur-fast) var(--ease-out),
+    text-decoration-color var(--dur-fast) var(--ease-out);
 }
 
 .scenario:hover {
@@ -225,6 +238,7 @@ code {
 }
 
 .notice {
+  animation: rise-in var(--dur) var(--ease-out);
   margin: 0 0 20px;
   padding: 10px 14px;
   border-left: 3px solid var(--down);
@@ -239,19 +253,39 @@ code {
 
 /* Live or sandbox: two states of one control, so it reads as a switch. */
 .mode-toggle {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   padding: 3px;
   border: 1px solid var(--rule);
   border-radius: 999px;
 }
 
+.mode-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--ink);
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.mode-toggle[data-mode="sandbox"]::before {
+  transform: translateX(100%);
+}
+
 .mode-toggle button {
+  position: relative;
   padding: 4px 14px;
   border: 0;
   border-radius: 999px;
   background: none;
   color: var(--ink-2);
   cursor: pointer;
+  transition:
+    color var(--dur) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .mode-toggle button:hover {
@@ -259,8 +293,12 @@ code {
 }
 
 .mode-toggle button[aria-pressed="true"] {
-  background: var(--ink);
   color: var(--paper);
+}
+
+.mode-toggle button:active,
+.theme-toggle:active {
+  transform: scale(0.97);
 }
 
 .workspace {
@@ -336,7 +374,7 @@ code {
 }
 
 .provider-bar span {
-  transition: width 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: width var(--dur-slow) var(--ease-out);
 }
 
 .bar-down {
@@ -401,6 +439,7 @@ code {
 }
 
 .feed-row {
+  animation: rise-in var(--dur) var(--ease-out);
   display: grid;
   grid-template-columns: 3.2em minmax(0, 1fr);
   gap: 8px;
@@ -421,6 +460,7 @@ code {
 }
 
 .feed-effect {
+  animation: fade-in var(--dur) var(--ease-out);
   display: block;
   font-size: 0.9rem;
   color: var(--ink-2);
@@ -554,6 +594,11 @@ code {
   font-size: 12px;
 }
 
+.fibre {
+  color: var(--light);
+  transition: color var(--dur-slow) var(--ease-out);
+}
+
 .fibre path {
   fill: none;
   stroke-linecap: round;
@@ -562,6 +607,7 @@ code {
 .fibre-track {
   stroke: var(--track);
   stroke-width: 1.4;
+  transition: stroke var(--dur) var(--ease-out);
 }
 
 .fibre-dead .fibre-track {
@@ -587,6 +633,19 @@ code {
   stroke-opacity: 0.4;
 }
 
+.fibre-glow,
+.fibre-light {
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+/* Unlit: the light fades out fast and stops moving, as if cut. */
+.fibre-dead :is(.fibre-glow, .fibre-light),
+.fibre-standby :is(.fibre-glow, .fibre-light) {
+  opacity: 0;
+  animation-play-state: paused;
+  transition-duration: var(--dur);
+}
+
 .fibre-glow {
   stroke: currentColor;
   stroke-width: 7;
@@ -608,6 +667,26 @@ code {
 @keyframes light-flow {
   to {
     stroke-dashoffset: -16;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--rise)));
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cross-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
   }
 }
 
@@ -639,8 +718,8 @@ code {
   stroke: var(--ink);
   stroke-width: 1.6;
   transition:
-    fill 200ms,
-    stroke 200ms;
+    fill var(--dur) var(--ease-out),
+    stroke var(--dur) var(--ease-out);
 }
 
 .site:hover .glyph {
@@ -679,6 +758,9 @@ code {
 }
 
 .site-cross {
+  animation: cross-in var(--dur) var(--ease-out);
+  transform-box: fill-box;
+  transform-origin: center;
   fill: none;
   stroke: var(--paper);
   stroke-width: 2.2;
@@ -770,6 +852,22 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Changes still fade, so they are noticed; nothing moves or scales. */
+  :root {
+    --rise: 0px;
+  }
+  .site-cross {
+    animation-name: fade-in;
+  }
+  .mode-toggle::before,
+  .mode-toggle button,
+  .theme-toggle {
+    transition: none;
+  }
+  .mode-toggle button:active,
+  .theme-toggle:active {
+    transform: none;
+  }
   .fibre-light {
     animation: none;
     stroke-dasharray: none;

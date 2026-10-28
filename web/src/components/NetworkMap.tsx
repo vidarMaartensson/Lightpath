@@ -97,12 +97,13 @@ function curve(a: NetNode, b: NetNode) {
 
 const Fibre = memo(function Fibre({ drawn }: { drawn: DrawnLink }) {
   const d = curve(drawn.from, drawn.to);
-  const lit = drawn.state === "active" || drawn.state === "rerouted";
+  // The light is always drawn and hidden by state, so it can fade out
+  // when a fibre goes dark instead of vanishing.
   return (
     <g className={`fibre fibre-${drawn.state}`}>
       <path className="fibre-track" d={d} />
-      {lit && <path className="fibre-glow" d={d} />}
-      {lit && <path className="fibre-light" d={d} />}
+      <path className="fibre-glow" d={d} />
+      <path className="fibre-light" d={d} />
     </g>
   );
 });
