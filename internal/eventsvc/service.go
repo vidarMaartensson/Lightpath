@@ -110,6 +110,9 @@ func (s *Service) Run(ctx context.Context, src events.Source) error {
 	})
 }
 
+// Subscribers is how many clients are watching.
+func (s *Service) Subscribers() int { return s.broker.Subscribers() }
+
 func (s *Service) currentLocked() Update {
 	return Update{Seq: s.state.Seq(), Down: s.state.Down()}
 }

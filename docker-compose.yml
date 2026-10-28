@@ -1,5 +1,5 @@
-# The whole system on one machine: Postgres, the two gRPC services and the
-# gateway. Only the gateway is published; the rest talk on the private
+# The whole system on one machine: Postgres, the three gRPC services and
+# the gateway. Only the gateway is published; the rest talk on the private
 # compose network.
 #
 #   make up      # build and start
@@ -55,6 +55,21 @@ services:
       LISTEN_ADDR: ":9002"
       TOPOLOGY_ADDR: topology:9001
       TOPOLOGY_TTL: 30s
+    depends_on:
+      - topology
+
+  events:
+    <<: *service
+    build:
+      context: .
+      target: service
+      args:
+        SERVICE: events
+    environment:
+      LISTEN_ADDR: ":9003"
+      TOPOLOGY_ADDR: topology:9001
+      # live runs the simulator; demo serves an empty state.
+      LIGHTPATH_MODE: ${LIGHTPATH_MODE:-live}
     depends_on:
       - topology
 

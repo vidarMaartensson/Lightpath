@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/vidarMaartensson/Lightpath/gen/lightpath/v1"
 	"github.com/vidarMaartensson/Lightpath/internal/events"
+	"github.com/vidarMaartensson/Lightpath/internal/eventsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/impact"
 	"github.com/vidarMaartensson/Lightpath/internal/impactsvc"
 	"github.com/vidarMaartensson/Lightpath/internal/network"
@@ -182,4 +183,19 @@ func EventFromProto(p *pb.Event) (events.Event, error) {
 		At:     p.GetAt().AsTime(),
 		Source: p.GetSource(),
 	}, nil
+}
+
+// LiveStateToProto converts the state part of an update.
+func LiveStateToProto(u eventsvc.Update) *pb.LiveState {
+	return &pb.LiveState{Seq: u.Seq, DownNodeIds: u.Down}
+}
+
+// UpdateToProto converts an update for the WatchState stream. The cause is
+// left unset for the snapshot a stream starts with.
+func UpdateToProto(u eventsvc.Update) *pb.WatchStateResponse {
+	out := &pb.WatchStateResponse{State: LiveStateToProto(u)}
+	if u.Cause != nil {
+		out.Cause = EventToProto(*u.Cause)
+	}
+	return out
 }

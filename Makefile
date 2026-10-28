@@ -27,6 +27,7 @@ dev: ## Run all services locally without Docker (in-memory topology) + Vite
 	@trap 'kill 0' EXIT; \
 	LISTEN_ADDR=:9001 go run ./cmd/topology & \
 	LISTEN_ADDR=:9002 TOPOLOGY_ADDR=localhost:9001 go run ./cmd/impact & \
+	LISTEN_ADDR=:9003 TOPOLOGY_ADDR=localhost:9001 LIGHTPATH_MODE=$${LIGHTPATH_MODE:-live} go run ./cmd/events & \
 	LISTEN_ADDR=:8080 go run ./cmd/gateway & \
 	cd web && npm run dev
 
