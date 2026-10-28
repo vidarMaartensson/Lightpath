@@ -1,23 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApiError, fetchNetwork, fetchOutage } from "./api";
+import { ApiError, fetchLiveStatus, fetchNetwork, fetchOutage } from "./api";
+import { EventFeed } from "./components/EventFeed";
 import { Headline } from "./components/Headline";
+import { ModeToggle } from "./components/ModeToggle";
 import { NetworkMap } from "./components/NetworkMap";
 import { NodeDetail } from "./components/NodeDetail";
 import { ProviderList } from "./components/ProviderList";
 import { Scenarios } from "./components/Scenarios";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { readDownFromUrl, writeDownToUrl } from "./lib/url";
-import type { Network, NodeImpact, NodeState, Outage } from "./types";
+import { initialMode, readDownFromUrl, writeViewToUrl, type Mode } from "./lib/url";
+import { useLive } from "./lib/useLive";
+import type { LiveStatus, Network, NodeImpact, NodeState, Outage } from "./types";
 
 type Load<T> = { status: "loading" } | { status: "ready"; data: T } | { status: "error"; message: string };
 
 export function App() {
   const [network, setNetwork] = useState<Load<Network>>({ status: "loading" });
-  const [down, setDown] = useState<string[]>(readDownFromUrl);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
+  const [mode, setMode] = useState<Mode | null>(null);
+  const [sandboxDown, setSandboxDown] = useState<string[]>(readDownFromUrl);
   const [outage, setOutage] = useState<Outage | null>(null);
   const [outageError, setOutageError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [inspected, setInspected] = useState<string | null>(null);
+  const [showLiveHint, setShowLiveHint] = useState(false);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -29,14 +35,41 @@ export function App() {
     return () => ctrl.abort();
   }, []);
 
+  // Whether there is a live view decides which view opens. If the gateway
+  // cannot say, the app opens as the sandbox it always was.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchLiveStatus(ctrl.signal)
+      .catch(() => "OFF" as const)
+      .then((status) => {
+        if (ctrl.signal.aborted) return;
+        setLiveStatus(status);
+        setMode(initialMode(status, window.location.search));
+      });
+    return () => ctrl.abort();
+  }, []);
+
+  const liveAvailable = liveStatus !== null && liveStatus !== "OFF";
+  // The stream stays open in the sandbox too, so the feed keeps up and
+  // switching back is instant.
+  const live = useLive(liveAvailable);
+  const down = mode === "live" ? live.down : sandboxDown;
+  // The live view sends a new list with every message; compare by content.
+  const downKey = down.join(",");
+
+  useEffect(() => {
+    if (mode) writeViewToUrl({ mode, down: sandboxDown, liveAvailable });
+  }, [mode, sandboxDown, liveAvailable]);
+
   // Re-analyse whenever the set of failed sites changes. The previous
   // answer stays on screen until the new one arrives, so the map never
   // flashes empty between clicks.
   useEffect(() => {
-    writeDownToUrl(down);
+    if (!mode) return;
+    const failed = downKey ? downKey.split(",") : [];
     const ctrl = new AbortController();
     setUpdating(true);
-    fetchOutage(down, ctrl.signal)
+    fetchOutage(failed, ctrl.signal)
       .then((o) => {
         setOutage(o);
         setOutageError(null);
@@ -48,12 +81,30 @@ export function App() {
         if (!ctrl.signal.aborted) setUpdating(false);
       });
     return () => ctrl.abort();
-  }, [down]);
+  }, [mode, downKey]);
 
-  const toggle = useCallback((id: string) => {
-    setDown((cur) => (cur.includes(id) ? cur.filter((d) => d !== id) : [...cur, id]));
-    setInspected(id);
-  }, []);
+  const toggle = useCallback(
+    (id: string) => {
+      setInspected(id);
+      // The live map follows the network; clicking explains how to experiment.
+      if (mode === "live") {
+        setShowLiveHint(true);
+        return;
+      }
+      setSandboxDown((cur) => (cur.includes(id) ? cur.filter((d) => d !== id) : [...cur, id]));
+    },
+    [mode],
+  );
+
+  // The sandbox starts from what is down live, to ask "what if X fails too?"
+  const changeMode = useCallback(
+    (next: Mode) => {
+      if (next === "sandbox" && mode === "live") setSandboxDown(live.down);
+      setShowLiveHint(false);
+      setMode(next);
+    },
+    [mode, live.down],
+  );
 
   const impacts = useMemo(() => {
     const m = new Map<string, NodeImpact>();
@@ -67,7 +118,7 @@ export function App() {
     return m;
   }, [outage]);
 
-  if (network.status === "loading") {
+  if (network.status === "loading" || mode === null) {
     return <div className="state-screen">Loading the network…</div>;
   }
   if (network.status === "error") {
@@ -85,6 +136,8 @@ export function App() {
   const net = network.data;
   const nodesById = new Map(net.nodes.map((n) => [n.id, n]));
   const inspectedNode = inspected ? nodesById.get(inspected) : undefined;
+  const isLive = mode === "live";
+  const liveDown = isLive && (liveStatus === "UNAVAILABLE" || live.connection === "unavailable");
 
   return (
     <div className="app">
@@ -94,13 +147,34 @@ export function App() {
           Lightpath
         </div>
         <p className="brand-tag">Outage impact on an open access fibre network</p>
-        <ThemeToggle />
+        <div className="masthead-controls">
+          {liveAvailable && <ModeToggle mode={mode} onChange={changeMode} />}
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className="lede" aria-live="polite">
         {outage ? <Headline outage={outage} /> : <h1 className="headline">Analysing…</h1>}
-        <Scenarios down={down} onChoose={setDown} />
+        {!isLive && <Scenarios down={sandboxDown} onChoose={setSandboxDown} />}
       </section>
+
+      {liveDown && (
+        <div className="notice" role="status">
+          The live view isn't responding, so the map may be out of date. The sandbox still works.{" "}
+          <button type="button" className="text-button" onClick={() => changeMode("sandbox")}>
+            Switch to sandbox
+          </button>
+        </div>
+      )}
+
+      {showLiveHint && isLive && !liveDown && (
+        <div className="notice notice-info" role="status">
+          The map follows the live network. Switch to sandbox to take sites down yourself.{" "}
+          <button type="button" className="text-button" onClick={() => changeMode("sandbox")}>
+            Switch to sandbox
+          </button>
+        </div>
+      )}
 
       {(outageError || outage?.stale) && (
         <div className="notice" role="status">
@@ -117,31 +191,38 @@ export function App() {
           impacts={impacts}
           down={down}
           updating={updating}
+          live={isLive}
           onToggle={toggle}
           onInspect={setInspected}
         />
 
         <aside className="side">
+          {isLive && <EventFeed feed={live.feed} connection={live.connection} nodesById={nodesById} />}
+
           <ProviderList network={net} outage={outage} />
 
           <section className="panel" aria-labelledby="down-title">
             <h2 id="down-title">Sites down</h2>
             {down.length === 0 ? (
-              <p className="empty">Select a site on the map to take it down.</p>
+              <p className="empty">
+                {isLive ? "Nothing is down right now." : "Select a site on the map to take it down."}
+              </p>
             ) : (
               <ul className="down-list">
                 {down.map((id) => (
                   <li key={id}>
                     <span>{nodesById.get(id)?.name ?? id}</span>
-                    <button type="button" className="text-button" onClick={() => toggle(id)}>
-                      Restore
-                    </button>
+                    {!isLive && (
+                      <button type="button" className="text-button" onClick={() => toggle(id)}>
+                        Restore
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             )}
-            {down.length > 1 && (
-              <button type="button" className="text-button restore-all" onClick={() => setDown([])}>
+            {!isLive && down.length > 1 && (
+              <button type="button" className="text-button restore-all" onClick={() => setSandboxDown([])}>
                 Restore all sites
               </button>
             )}

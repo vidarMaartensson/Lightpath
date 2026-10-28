@@ -16,6 +16,7 @@
   --reroute-wash: #ebe6fb;
   --down: #cf3a2b;
   --down-wash: #fbe7e4;
+  --light-wash: #e2f2f5;
 
   --font: "Familjen Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -36,6 +37,7 @@
   --reroute-wash: #261f45;
   --down: #ff6b5b;
   --down-wash: #3a1d1c;
+  --light-wash: #10303a;
   color-scheme: dark;
 }
 
@@ -118,9 +120,15 @@ code {
   color: var(--ink-2);
 }
 
-.theme-toggle {
+.masthead-controls {
   margin-left: auto;
   align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.theme-toggle {
   display: grid;
   place-items: center;
   width: 36px;
@@ -150,7 +158,7 @@ code {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .theme-toggle {
+  .masthead-controls {
     grid-column: 2;
     grid-row: 1 / span 2;
   }
@@ -222,6 +230,37 @@ code {
   border-left: 3px solid var(--down);
   background: var(--down-wash);
   max-width: 72ch;
+}
+
+.notice-info {
+  border-left-color: var(--light);
+  background: var(--light-wash);
+}
+
+/* Live or sandbox: two states of one control, so it reads as a switch. */
+.mode-toggle {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.mode-toggle button {
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.mode-toggle button:hover {
+  color: var(--ink);
+}
+
+.mode-toggle button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .workspace {
@@ -312,6 +351,87 @@ code {
   margin: 4px 0 0;
   font-size: 0.85rem;
   color: var(--reroute);
+}
+
+.feed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* The dot breathes while the stream is live, like the light in the fibre. */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.live-dot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.live-dot-live::before {
+  background: var(--light);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+.live-dot-unavailable::before {
+  background: var(--down);
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.feed-row {
+  display: grid;
+  grid-template-columns: 3.2em minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.feed-row:first-child {
+  border-top: 1px solid var(--rule);
+}
+
+.feed-row time {
+  color: var(--ink-3);
+}
+
+.feed-what {
+  display: block;
+}
+
+.feed-effect {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+.feed-down {
+  color: var(--down);
+}
+
+.feed-restored {
+  color: var(--light);
 }
 
 .down-list {
@@ -658,5 +778,8 @@ code {
   .provider-bar span,
   .glyph {
     transition: none;
+  }
+  .live-dot-live::before {
+    animation: none;
   }
 }
