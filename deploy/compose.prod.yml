@@ -8,6 +8,13 @@ services:
   gateway:
     ports: !reset []
 
+  # A visitor stays a minute or two, so the public demo runs faster than the
+  # defaults to show something happening.
+  events:
+    environment:
+      SIM_INTERVAL: ${SIM_INTERVAL:-45s}
+      SIM_MEAN_REPAIR: ${SIM_MEAN_REPAIR:-90s}
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped

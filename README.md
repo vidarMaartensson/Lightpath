@@ -127,13 +127,34 @@ the compose stack, with Caddy in front for HTTPS.
    ports 80 and 443.
 2. Attach a static IP, and point a DNS A record (for example `lightpath.yourdomain.se`) at it.
 3. SSH in and run `deploy/lightsail-setup.sh`. It adds swap and installs Docker.
-4. Clone the repo and start it:
+4. Clone the repo, put the settings in `.env` and start it:
 
    ```bash
-   DOMAIN=lightpath.yourdomain.se POSTGRES_PASSWORD='something-long' make deploy
+   git clone https://github.com/vidarMaartensson/Lightpath.git && cd Lightpath
+   cat > .env <<EOF
+   DOMAIN=lightpath.yourdomain.se
+   POSTGRES_PASSWORD=$(openssl rand -hex 24)
+   EOF
+   make deploy
    ```
 
+   Keep the settings in `.env`, not on the command line. Postgres sets its password only on first
+   start; a later deploy without it would fall back to the default, and topology could not log
+   in. Compose reads `.env` on every run, and git and Docker both ignore it.
+
 Caddy fetches a certificate on first request. Set a billing alarm in AWS before anything else.
+
+To update, pull and deploy again; only changed images are rebuilt:
+
+```bash
+git pull && make deploy
+make logs                     # follow all services
+docker compose logs events    # or one of them
+```
+
+The public stack runs the simulator faster than the defaults, a failure every 45 seconds on
+average, so a visitor sees something happen. Set `SIM_INTERVAL`, `SIM_MEAN_REPAIR` or
+`SIM_MAX_CONCURRENT` in `.env` to change it.
 
 ## Decisions and trade-offs
 

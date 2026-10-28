@@ -1,4 +1,4 @@
-# The whole system on one machine: Postgres, the three gRPC services and
+# The whole system on one machine: Postgres, the four gRPC services and
 # the gateway. Only the gateway is published; the rest talk on the private
 # compose network.
 #
@@ -70,6 +70,10 @@ services:
       TOPOLOGY_ADDR: topology:9001
       # live runs the simulator; demo serves an empty state.
       LIGHTPATH_MODE: ${LIGHTPATH_MODE:-live}
+      # Simulator pace. Empty means the defaults in internal/events/sim.
+      SIM_INTERVAL: ${SIM_INTERVAL:-}
+      SIM_MEAN_REPAIR: ${SIM_MEAN_REPAIR:-}
+      SIM_MAX_CONCURRENT: ${SIM_MAX_CONCURRENT:-}
     depends_on:
       - topology
 

@@ -23,4 +23,6 @@ fi
 echo
 echo "Docker is installed. Log out and back in so the docker group applies, then:"
 echo "  git clone https://github.com/vidarMaartensson/Lightpath.git && cd Lightpath"
-echo "  DOMAIN=<your domain> POSTGRES_PASSWORD=<something long> make deploy"
+echo "  printf 'DOMAIN=<your domain>\\nPOSTGRES_PASSWORD=%s\\n' \"\$(openssl rand -hex 24)\" > .env"
+echo "  make deploy"
+echo "See \"Deploy to AWS\" in README.md for why the settings live in .env."
