@@ -69,50 +69,14 @@ type Result struct {
 // Duplicate ids are ignored. An unknown id is an error rather than being
 // silently skipped: an operator who typed the wrong site should find out.
 func Analyze(n *network.Network, failedIDs []string) (Result, error) {
-	index := make(map[string]int, len(n.Nodes))
-	for i, node := range n.Nodes {
-		index[node.ID] = i
+	ev, err := evaluate(n, failedIDs)
+	if err != nil {
+		return Result{}, err
 	}
-
-	failed := make([]bool, len(n.Nodes))
-	var failedList []string
-	for _, id := range failedIDs {
-		i, ok := index[id]
-		if !ok {
-			return Result{}, fmt.Errorf("%w: %q", ErrUnknownNode, id)
-		}
-		if !failed[i] {
-			failed[i] = true
-			failedList = append(failedList, id)
-		}
-	}
-	sort.Strings(failedList)
-
-	adj := adjacency(n, index)
-
-	// The normal path: a breadth-first tree from all cores on the intact
-	// network. Neighbours are visited in link order, so a node's first
-	// listed uplink is its primary one when two paths are equally short.
-	parent := bfs(n, adj, nil)
-	// What can still reach a core with the failures applied.
-	reach := bfs(n, adj, failed)
-
-	states := make([]NodeState, len(n.Nodes))
-	for i := range n.Nodes {
-		switch {
-		case failed[i]:
-			states[i] = Failed
-		case reach[i] == unreached:
-			states[i] = Isolated
-		case pathBroken(i, parent, failed):
-			states[i] = Rerouted
-		default:
-			states[i] = Online
-		}
-	}
+	index, states := ev.index, ev.states
 
 	res := Result{
-		FailedNodeIDs:  failedList,
+		FailedNodeIDs:  ev.failed,
 		TotalCustomers: len(n.Customers),
 		Nodes:          make([]NodeImpact, len(n.Nodes)),
 	}
@@ -155,6 +119,61 @@ func Analyze(n *network.Network, failedIDs []string) (Result, error) {
 		return res.ISPs[a].ISPID < res.ISPs[b].ISPID
 	})
 	return res, nil
+}
+
+// evaluation is the state of every node with a set of failures applied.
+type evaluation struct {
+	index  map[string]int
+	states []NodeState
+	failed []string // deduplicated and sorted
+}
+
+// evaluate applies the failures and works out each node's state. Analyze
+// and Diff both build on it, so they agree on what "affected" means.
+func evaluate(n *network.Network, failedIDs []string) (evaluation, error) {
+	index := make(map[string]int, len(n.Nodes))
+	for i, node := range n.Nodes {
+		index[node.ID] = i
+	}
+
+	failed := make([]bool, len(n.Nodes))
+	var failedList []string
+	for _, id := range failedIDs {
+		i, ok := index[id]
+		if !ok {
+			return evaluation{}, fmt.Errorf("%w: %q", ErrUnknownNode, id)
+		}
+		if !failed[i] {
+			failed[i] = true
+			failedList = append(failedList, id)
+		}
+	}
+	sort.Strings(failedList)
+
+	adj := adjacency(n, index)
+
+	// The normal path: a breadth-first tree from all cores on the intact
+	// network. Neighbours are visited in link order, so a node's first
+	// listed uplink is its primary one when two paths are equally short.
+	parent := bfs(n, adj, nil)
+	// What can still reach a core with the failures applied.
+	reach := bfs(n, adj, failed)
+
+	states := make([]NodeState, len(n.Nodes))
+	for i := range n.Nodes {
+		switch {
+		case failed[i]:
+			states[i] = Failed
+		case reach[i] == unreached:
+			states[i] = Isolated
+		case pathBroken(i, parent, failed):
+			states[i] = Rerouted
+		default:
+			states[i] = Online
+		}
+	}
+
+	return evaluation{index: index, states: states, failed: failedList}, nil
 }
 
 // customerOutcome: affected if no attachment has service; rerouted if the

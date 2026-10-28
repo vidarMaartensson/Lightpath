@@ -54,16 +54,27 @@ func (r *Resolver) Network(ctx context.Context) (*networkResolver, error) {
 }
 
 // Outage resolves Query.outage.
-func (r *Resolver) Outage(ctx context.Context, args struct{ FailedNodeIds []graphql.ID }) (*outageResolver, error) {
-	ids := make([]string, len(args.FailedNodeIds))
-	for i, id := range args.FailedNodeIds {
-		ids[i] = string(id)
+func (r *Resolver) Outage(ctx context.Context, args struct {
+	FailedNodeIds   []graphql.ID
+	BaselineNodeIds *[]graphql.ID
+}) (*outageResolver, error) {
+	req := &pb.AnalyzeOutageRequest{FailedNodeIds: idStrings(args.FailedNodeIds)}
+	if args.BaselineNodeIds != nil {
+		req.Baseline = &pb.Baseline{FailedNodeIds: idStrings(*args.BaselineNodeIds)}
 	}
-	resp, err := r.impact.AnalyzeOutage(ctx, &pb.AnalyzeOutageRequest{FailedNodeIds: ids})
+	resp, err := r.impact.AnalyzeOutage(ctx, req)
 	if err != nil {
 		return nil, userError("impact", err)
 	}
 	return &outageResolver{o: resp}, nil
+}
+
+func idStrings(ids []graphql.ID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = string(id)
+	}
+	return out
 }
 
 // userError turns a gRPC error into a message for the UI. Internal details
@@ -144,6 +155,13 @@ func (r *outageResolver) AffectedCustomers() int32 { return r.o.GetAffectedCusto
 func (r *outageResolver) ReroutedCustomers() int32 { return r.o.GetReroutedCustomers() }
 func (r *outageResolver) Stale() bool              { return r.o.GetStale() }
 
+func (r *outageResolver) Change() *changeResolver {
+	if r.o.GetChange() == nil {
+		return nil
+	}
+	return &changeResolver{r.o.GetChange()}
+}
+
 func (r *outageResolver) Isps() []*ispImpactResolver {
 	out := make([]*ispImpactResolver, len(r.o.GetIsps()))
 	for i, x := range r.o.GetIsps() {
@@ -176,3 +194,9 @@ func (r *nodeImpactResolver) State() string {
 func (r *nodeImpactResolver) Customers() int32 { return r.n.GetCustomers() }
 func (r *nodeImpactResolver) Affected() int32  { return r.n.GetAffected() }
 func (r *nodeImpactResolver) Rerouted() int32  { return r.n.GetRerouted() }
+
+type changeResolver struct{ c *pb.CustomerChange }
+
+func (r *changeResolver) Lost() int32     { return r.c.GetLost() }
+func (r *changeResolver) Regained() int32 { return r.c.GetRegained() }
+func (r *changeResolver) Rerouted() int32 { return r.c.GetRerouted() }

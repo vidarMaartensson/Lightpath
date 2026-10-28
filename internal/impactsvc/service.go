@@ -37,6 +37,9 @@ type Analysis struct {
 	// Stale is true when the topology service was unreachable and the last
 	// known snapshot was used instead.
 	Stale bool
+	// Change is set by AnalyzeChange: what happened to customers going from
+	// the baseline to this outage.
+	Change *impact.Change
 }
 
 // Service analyses outages against a cached topology snapshot.
@@ -71,14 +74,8 @@ func New(src TopologySource, ttl time.Duration, opts ...Option) *Service {
 
 // Analyze computes the impact of the failed nodes.
 func (s *Service) Analyze(ctx context.Context, failedNodeIDs []string) (Analysis, error) {
-	if len(failedNodeIDs) > MaxFailedNodes {
-		return Analysis{}, fmt.Errorf("%w: at most %d failed nodes per request, got %d",
-			ErrInvalidInput, MaxFailedNodes, len(failedNodeIDs))
-	}
-	for _, id := range failedNodeIDs {
-		if id == "" {
-			return Analysis{}, fmt.Errorf("%w: empty node id", ErrInvalidInput)
-		}
+	if err := checkIDs(failedNodeIDs); err != nil {
+		return Analysis{}, err
 	}
 
 	net, stale, err := s.network(ctx)
@@ -87,13 +84,58 @@ func (s *Service) Analyze(ctx context.Context, failedNodeIDs []string) (Analysis
 	}
 
 	res, err := impact.Analyze(net, failedNodeIDs)
-	if errors.Is(err, impact.ErrUnknownNode) {
-		return Analysis{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
+	if err != nil {
+		return Analysis{}, inputError(err)
 	}
+	return Analysis{Result: res, Stale: stale}, nil
+}
+
+// AnalyzeChange is Analyze plus what changed for customers going from the
+// baseline failures to these. Both are computed on the same snapshot, so
+// the change and the totals never disagree.
+func (s *Service) AnalyzeChange(ctx context.Context, baseline, failedNodeIDs []string) (Analysis, error) {
+	if err := checkIDs(failedNodeIDs); err != nil {
+		return Analysis{}, err
+	}
+	if err := checkIDs(baseline); err != nil {
+		return Analysis{}, fmt.Errorf("baseline: %w", err)
+	}
+
+	net, stale, err := s.network(ctx)
 	if err != nil {
 		return Analysis{}, err
 	}
-	return Analysis{Result: res, Stale: stale}, nil
+
+	res, err := impact.Analyze(net, failedNodeIDs)
+	if err != nil {
+		return Analysis{}, inputError(err)
+	}
+	ch, err := impact.Diff(net, baseline, failedNodeIDs)
+	if err != nil {
+		return Analysis{}, inputError(fmt.Errorf("baseline: %w", err))
+	}
+	return Analysis{Result: res, Stale: stale, Change: &ch}, nil
+}
+
+func checkIDs(ids []string) error {
+	if len(ids) > MaxFailedNodes {
+		return fmt.Errorf("%w: at most %d failed nodes per request, got %d",
+			ErrInvalidInput, MaxFailedNodes, len(ids))
+	}
+	for _, id := range ids {
+		if id == "" {
+			return fmt.Errorf("%w: empty node id", ErrInvalidInput)
+		}
+	}
+	return nil
+}
+
+// inputError marks an unknown node as the caller's mistake.
+func inputError(err error) error {
+	if errors.Is(err, impact.ErrUnknownNode) {
+		return fmt.Errorf("%w: %w", ErrInvalidInput, err)
+	}
+	return err
 }
 
 // network returns a snapshot, refreshing it when it is older than the ttl.

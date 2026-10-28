@@ -131,3 +131,58 @@ func TestInvalidInput(t *testing.T) {
 		})
 	}
 }
+
+func TestAnalyzeChange(t *testing.T) {
+	src := &fakeSource{responses: []func() (*network.Network, error){ok}}
+	s := newService(src, &clock{})
+
+	a, err := s.AnalyzeChange(context.Background(), nil, []string{"acc-ali"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Change == nil || a.Change.Lost != 76 {
+		t.Fatalf("change = %+v, want 76 lost", a.Change)
+	}
+	if a.AffectedCustomers != 76 {
+		t.Fatalf("affected = %d, want 76", a.AffectedCustomers)
+	}
+
+	plain, err := s.Analyze(context.Background(), []string{"acc-ali"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.Change != nil {
+		t.Fatalf("Analyze set a change: %+v", plain.Change)
+	}
+}
+
+func TestAnalyzeChangeInvalidBaseline(t *testing.T) {
+	tooMany := make([]string, MaxFailedNodes+1)
+	for i := range tooMany {
+		tooMany[i] = "n" + strconv.Itoa(i)
+	}
+	tests := map[string][]string{
+		"unknown node": {"acc-nowhere"},
+		"empty id":     {""},
+		"too many":     tooMany,
+	}
+	for name, baseline := range tests {
+		t.Run(name, func(t *testing.T) {
+			src := &fakeSource{responses: []func() (*network.Network, error){ok}}
+			s := newService(src, &clock{})
+			_, err := s.AnalyzeChange(context.Background(), baseline, []string{"acc-ali"})
+			if !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("want ErrInvalidInput, got %v", err)
+			}
+		})
+	}
+}
+
+func TestAnalyzeChangeTopologyUnavailable(t *testing.T) {
+	src := &fakeSource{responses: []func() (*network.Network, error){down}}
+	s := newService(src, &clock{})
+	_, err := s.AnalyzeChange(context.Background(), nil, []string{"acc-ali"})
+	if !errors.Is(err, ErrTopologyUnavailable) {
+		t.Fatalf("want ErrTopologyUnavailable, got %v", err)
+	}
+}

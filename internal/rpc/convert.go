@@ -112,6 +112,11 @@ func AnalysisToProto(a impactsvc.Analysis) *pb.AnalyzeOutageResponse {
 		Nodes:             make([]*pb.NodeImpact, 0, len(a.Nodes)),
 		Stale:             a.Stale,
 	}
+	if c := a.Change; c != nil {
+		out.Change = &pb.CustomerChange{
+			Lost: int32(c.Lost), Regained: int32(c.Regained), Rerouted: int32(c.Rerouted),
+		}
+	}
 	for _, i := range a.ISPs {
 		out.Isps = append(out.Isps, &pb.IspImpact{
 			IspId: i.ISPID, Customers: int32(i.Customers), Affected: int32(i.Affected), Rerouted: int32(i.Rerouted),

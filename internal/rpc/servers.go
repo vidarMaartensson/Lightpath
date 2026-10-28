@@ -38,7 +38,13 @@ type ImpactServer struct {
 
 // AnalyzeOutage implements pb.ImpactServiceServer.
 func (s *ImpactServer) AnalyzeOutage(ctx context.Context, req *pb.AnalyzeOutageRequest) (*pb.AnalyzeOutageResponse, error) {
-	a, err := s.Service.Analyze(ctx, req.GetFailedNodeIds())
+	var a impactsvc.Analysis
+	var err error
+	if b := req.GetBaseline(); b != nil {
+		a, err = s.Service.AnalyzeChange(ctx, b.GetFailedNodeIds(), req.GetFailedNodeIds())
+	} else {
+		a, err = s.Service.Analyze(ctx, req.GetFailedNodeIds())
+	}
 	switch {
 	case errors.Is(err, impactsvc.ErrInvalidInput):
 		return nil, status.Error(codes.InvalidArgument, err.Error())

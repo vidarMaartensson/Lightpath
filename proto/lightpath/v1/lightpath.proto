@@ -108,6 +108,24 @@ message IspImpact {
 
 message AnalyzeOutageRequest {
   repeated string failed_node_ids = 1;
+  // When set, the response also says what changed for customers going
+  // from the baseline to failed_node_ids. A message rather than a repeated
+  // field, so "compare with nothing down" and "do not compare" differ.
+  Baseline baseline = 2;
+}
+
+message Baseline {
+  repeated string failed_node_ids = 1;
+}
+
+// Counted customer by customer, not as a difference of totals.
+message CustomerChange {
+  // Had service in the baseline, has none now.
+  int32 lost = 1;
+  // Had no service in the baseline, has it now.
+  int32 regained = 2;
+  // Has service in both, but now only over another path.
+  int32 rerouted = 3;
 }
 
 message AnalyzeOutageResponse {
@@ -121,6 +139,8 @@ message AnalyzeOutageResponse {
   // True when the topology service was unreachable and the last known
   // snapshot was used.
   bool stale = 7;
+  // Set only when the request had a baseline.
+  CustomerChange change = 8;
 }
 
 // ---------------------------------------------------------------------------
