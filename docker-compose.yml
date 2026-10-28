@@ -84,11 +84,13 @@ services:
       LISTEN_ADDR: ":8080"
       TOPOLOGY_ADDR: topology:9001
       IMPACT_ADDR: impact:9002
+      EVENTS_ADDR: events:9003
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
       - topology
       - impact
+      - events
 
 volumes:
   pgdata:

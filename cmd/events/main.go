@@ -62,7 +62,7 @@ func run(log *slog.Logger) error {
 	}
 
 	srv, health := rpc.NewServer(log)
-	pb.RegisterEventServiceServer(srv, &rpc.EventServer{Service: svc})
+	pb.RegisterEventServiceServer(srv, &rpc.EventServer{Service: svc, Live: mode == "live"})
 	health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
 	lis, err := net.Listen("tcp", addr)

@@ -1,4 +1,7 @@
 {$DOMAIN} {
-	encode zstd gzip
+	# The live stream is left uncompressed: a compressor may hold small
+	# events back until its buffer fills, and SSE needs each one sent now.
+	@compressible not path /live
+	encode @compressible zstd gzip
 	reverse_proxy gateway:8080
 }

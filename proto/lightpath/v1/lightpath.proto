@@ -185,6 +185,9 @@ message GetStateRequest {}
 
 message GetStateResponse {
   LiveState state = 1;
+  // True when a source changes the state by itself (LIGHTPATH_MODE=live).
+  // False in demo mode, where the state stays empty.
+  bool live = 2;
 }
 
 message WatchStateRequest {}

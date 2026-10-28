@@ -9,6 +9,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/graphql": process.env.GATEWAY_URL ?? "http://localhost:8080",
+      "/live": process.env.GATEWAY_URL ?? "http://localhost:8080",
     },
   },
 });

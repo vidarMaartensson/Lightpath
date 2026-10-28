@@ -43,12 +43,12 @@ func (memSource) Network(context.Context) (*network.Network, error) { return net
 
 func newServer(t *testing.T, topo TopologyClient) *httptest.Server {
 	t.Helper()
-	schema, err := NewSchema(topo, fakeImpact{svc: impactsvc.New(memSource{}, 0)})
+	schema, err := NewSchema(topo, fakeImpact{svc: impactsvc.New(memSource{}, 0)}, nil)
 	if err != nil {
 		t.Fatalf("schema: %v", err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	srv := httptest.NewServer(Handler(schema, "", log))
+	srv := httptest.NewServer(Handler(schema, nil, "", log))
 	t.Cleanup(srv.Close)
 	return srv
 }

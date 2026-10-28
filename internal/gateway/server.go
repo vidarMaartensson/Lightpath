@@ -13,10 +13,14 @@ import (
 )
 
 // Handler serves the GraphQL API at /graphql, a health check at /healthz,
-// and, when staticDir is set, the built frontend with SPA fallback.
-func Handler(schema *graphql.Schema, staticDir string, log *slog.Logger) http.Handler {
+// the live stream at /live when live is not nil, and, when staticDir is
+// set, the built frontend with SPA fallback.
+func Handler(schema *graphql.Schema, live http.Handler, staticDir string, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("POST /graphql", &relay.Handler{Schema: schema})
+	if live != nil {
+		mux.Handle("GET /live", live)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		_, _ = w.Write([]byte("ok"))
@@ -55,6 +59,10 @@ func (s *statusRecorder) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
 }
+
+// Unwrap lets http.ResponseController reach the underlying writer, which
+// the live stream needs to flush and to lift its write deadline.
+func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
 func withLogging(next http.Handler, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -92,11 +92,13 @@ func LoggingInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 type EventServer struct {
 	pb.UnimplementedEventServiceServer
 	Service *eventsvc.Service
+	// Live is reported by GetState: whether a source feeds the state.
+	Live bool
 }
 
 // GetState implements pb.EventServiceServer.
 func (s *EventServer) GetState(context.Context, *pb.GetStateRequest) (*pb.GetStateResponse, error) {
-	return &pb.GetStateResponse{State: LiveStateToProto(s.Service.State())}, nil
+	return &pb.GetStateResponse{State: LiveStateToProto(s.Service.State()), Live: s.Live}, nil
 }
 
 // WatchState implements pb.EventServiceServer. It ends with UNAVAILABLE

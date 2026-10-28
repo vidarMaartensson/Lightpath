@@ -11,6 +11,17 @@ type Query {
   these did to customers; an empty baseline means nothing was down before.
   """
   outage(failedNodeIds: [ID!]!, baselineNodeIds: [ID!]): Outage!
+  "Whether the live view can be shown. The sandbox works either way."
+  liveStatus: LiveStatus!
+}
+
+enum LiveStatus {
+  "Sites fail and recover by themselves; /live streams the state."
+  ON
+  "No live source runs. The app is a sandbox only."
+  OFF
+  "Live is configured but the events service did not answer."
+  UNAVAILABLE
 }
 
 enum NodeKind {

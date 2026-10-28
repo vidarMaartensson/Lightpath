@@ -32,9 +32,10 @@ type ImpactClient interface {
 
 // NewSchema parses the schema and binds it to the resolvers. The schema
 // documents itself with quoted descriptions, which graphql-go only accepts
-// with UseStringDescriptions.
-func NewSchema(topology TopologyClient, impact ImpactClient) (*graphql.Schema, error) {
-	return graphql.ParseSchema(schemaSDL, &Resolver{topology: topology, impact: impact},
+// with UseStringDescriptions. events may be nil when no events service is
+// configured; liveStatus is then OFF.
+func NewSchema(topology TopologyClient, impact ImpactClient, events EventsClient) (*graphql.Schema, error) {
+	return graphql.ParseSchema(schemaSDL, &Resolver{topology: topology, impact: impact, events: events},
 		graphql.UseStringDescriptions())
 }
 
@@ -42,6 +43,24 @@ func NewSchema(topology TopologyClient, impact ImpactClient) (*graphql.Schema, e
 type Resolver struct {
 	topology TopologyClient
 	impact   ImpactClient
+	events   EventsClient
+}
+
+// LiveStatus resolves Query.liveStatus. An unreachable events service is
+// an answer here, not an error: the page still loads and says so.
+func (r *Resolver) LiveStatus(ctx context.Context) string {
+	if r.events == nil {
+		return "OFF"
+	}
+	resp, err := r.events.GetState(ctx, &pb.GetStateRequest{})
+	switch {
+	case err != nil:
+		return "UNAVAILABLE"
+	case resp.GetLive():
+		return "ON"
+	default:
+		return "OFF"
+	}
 }
 
 // Network resolves Query.network.
