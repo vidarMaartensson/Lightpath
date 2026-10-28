@@ -34,7 +34,13 @@ export function EventFeed({ feed, connection, nodesById }: Props) {
                 <time dateTime={entry.at}>{feedTime(entry.at)}</time>
                 <span>
                   <span className="feed-what">{line.what}</span>
-                  <span className={`feed-effect${line.tone ? ` feed-${line.tone}` : ""}`}>{line.effect}</span>
+                  {/* Keyed by status so the numbers fade in when they arrive. */}
+                  <span
+                    key={entry.change.status}
+                    className={`feed-effect${line.tone ? ` feed-${line.tone}` : ""}`}
+                  >
+                    {line.effect}
+                  </span>
                 </span>
               </li>
             );

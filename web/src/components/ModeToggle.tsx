@@ -7,7 +7,7 @@ const MODES: { mode: Mode; label: string }[] = [
 
 export function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
   return (
-    <div className="mode-toggle" role="group" aria-label="View">
+    <div className="mode-toggle" role="group" aria-label="View" data-mode={mode}>
       {MODES.map((m) => (
         <button
           key={m.mode}
