@@ -2,6 +2,8 @@
 
 **When a fibre site goes down, who actually loses service, and which ISPs need to be told?**
 
+![Taking down two sites in the sandbox: the headline, the map and the list of ISPs to notify update as traffic moves to backup paths, then everything is restored.](docs/demo.gif)
+
 On an open access network, many ISPs sell subscriptions over the same fibre. When an access site
 fails, the naive answer is "everyone behind it". The real answer depends on topology: a cabinet
 with a second fibre to a neighbouring site stays up, and a dual-homed business customer keeps
@@ -263,6 +265,7 @@ internal/gateway     GraphQL schema, resolvers, SSE, HTTP server
 proto/               gRPC contract
 web/                 React + TypeScript frontend
 deploy/              Caddy and Lightsail setup
+docs/                demo recording for this README
 ```
 
 Built with Claude Code as a pair. See `CLAUDE.md` for the rules the agent works under.
